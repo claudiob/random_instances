@@ -4,3 +4,5 @@ MIT-LICENSE
 README.md
 setup.py
 random_instances/__init__.py
+random_instances/models.py
+random_instances/tests.py

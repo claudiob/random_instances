@@ -1,7 +1,10 @@
 from urllib import urlretrieve
 from random import choice
-from string import letters
-from random import randint
+from string import printable, lowercase, digits
+from random import randint, randrange, random
+from datetime import date, datetime, timedelta
+from decimal import Decimal
+from os import path, listdir
 
 from django.db.models import fields
 from django.core.files import File
@@ -41,19 +44,19 @@ def fill_field(field):
     try:
         return eval("random_%s(field)" % internal_type)
     except NameError:
-        # TODO:
-        # BigIntegerField, DecimalField, FloatField, IntegerField, PositiveIntegerField, PositiveSmallIntegerField, SmallIntegerField
-        # BooleanField, NullBooleanField
-        # CommaSeparatedIntegerField
-        # EmailField
-        # FileField, FilePathField
-        # IPAddressField
-        # SlugField
-        # DateField, DateTimeField, TimeField
-        # ManyToManyField, OneToOneField
-        # URLField
-        # XMLField
         raise NameError, "Don't know how randomly fill a %s" % internal_type    
+
+def random_BigIntegerField(field):
+    """
+    Generates a random number for a BigIntegerField.
+    """
+    return randint(-2**63+1, 2**63)
+
+def random_BooleanField(field):
+    """
+    Generates a random boolean for a BooleanField.
+    """
+    return bool(randint(0,1))
 
 def random_CharField(field):
     """
@@ -63,7 +66,121 @@ def random_CharField(field):
     for validator in field.validators:
         if type(validator) == MaxLengthValidator:
             limit = validator.limit_value
-    return "".join([choice(letters) for i in xrange(randint(1, limit))])
+    if type(field) == fields.CharField:
+        length = xrange(randint(1, limit))
+        return "".join([choice(printable) for i in length])
+    elif type(field) == fields.CommaSeparatedIntegerField:
+        length = xrange(randint(1, limit))
+        return "".join([choice(digits+',') for i in length]).strip(',')
+    elif type(field) == fields.EmailField:
+        suffix = '@example.com' # harmless domain, avoids spamming people
+        length = xrange(randint(1, (limit or 75)-len(suffix)))
+        return ''.join([choice(lowercase) for i in length]) + suffix
+    elif type(field) == fields.URLField:
+        prefix = 'http://'
+        suffix = '.example.com' # harmless domain, avoids spamming people
+        length = xrange(randint(1, (limit or 200)-len(prefix)-len(suffix)))
+        return prefix + ''.join([choice(lowercase) for i in length]) + suffix
+    elif type(field) == fields.XMLField:
+        pass # raise AssertionError, "TODO!"
+
+def random_DateField(field):
+    """
+    Generates a random date for a DateField.
+    By convenience, restrict to +/- 10000 days from now.
+    """
+    return date.today() + timedelta(randint(-10000,10000))
+
+def random_DateTimeField(field):
+    """
+    Generates a random date/time for a DateTimeField.
+    By convenience, restrict to +/- 10000 days from now.
+    """
+    return datetime.now() + timedelta(randint(-10000,10000))
+
+def random_DecimalField(field):
+    """
+    Generates a random number for a DecimalField.
+    Satisfies the MaxLengthValidator requirement of the field.
+    """
+    return Decimal(randrange(10**field.max_digits))/10**field.decimal_places
+
+def random_FileField(field):
+    """
+    Find or download a random image object for a FileField.
+    """
+    if type(field) == fields.files.FileField:
+        local_path = random_FilePathField(field)
+    elif type(field) == fields.files.ImageField:
+        # TODO: Get a random image from flickr instead
+        remote_path="http://blazingwolf.com/drupal6/files/random%20flame.jpg"
+        local_path = 'tmp/random.jpg' # to not clutter the current folder
+        # if not exists(local_path): 
+        urlretrieve(remote_path, local_path)    
+    f = open(local_path, 'r')
+    f.read()
+    # TODO: Close the file at the end
+    return File(f)
+
+def random_FilePathField(field):
+    """
+    Picks a random file path for a FilePathField.
+    If a path is not specified, picks a file path from the current folder.
+    """
+    if hasattr(field, 'path'):
+        folder = field.path
+    else:
+        folder = "."
+    return choice([f for f in listdir(folder) 
+        if path.isfile(path.join(folder, f))])
+
+def random_FloatField(field):
+    """
+    Generates a random float for a FloatField.
+    By convenience, restrict to +/- 10^10.
+    """
+    return random()*10**randrange(-10,10)
+
+def random_IntegerField(field):
+    """
+    Generates a random number for an IntegerField.
+    """
+    return randint(-2**31+1, 2**31)
+
+def random_IPAddressField(field):
+    """
+    Generates a random IP Address for an IPAddressField.
+    """
+    return ".".join([str(randrange(0,255)) for i in xrange(4)])
+
+def random_PositiveIntegerField(field):
+    """
+    Generates a random positive number for an PositiveIntegerField.
+    """
+    return randint(0, 2**31)
+
+def random_PositiveSmallIntegerField(field):
+    """
+    Generates a random positive number for an PositiveSmallIntegerField.
+    """
+    return randint(0, 2**31)
+
+def random_SlugField(field):
+    """
+    Generates random char data for a SlugField.
+    Satisfies the MaxLengthValidator requirement of the field if present.
+    """
+    for validator in field.validators:
+        if type(validator) == MaxLengthValidator:
+            limit = validator.limit_value
+    length = xrange(randint(1, (limit or 50)))
+    return "".join([choice(lowercase) for i in length])
+
+def random_SmallIntegerField(field):
+    """
+    Generates a random number for a SmallIntegerField.
+    """
+    return randint(-2**31+1, 2**31)
 
 def random_TextField(field):
     """
@@ -72,30 +189,9 @@ def random_TextField(field):
     limit = randint(1, 5)
     return "\n".join(lorem_ipsum.paragraphs(2, False))
 
-def random_SlugField(field):
-    """
-    Generates random char data for a SlugField.
-    """
-    return random_CharField(field).strip().lower().replace(" ","_")
-        
 def random_ForeignKey(field):
     """
     Find or generate a random related object for a ForeignKey.
     """
     return get_or_create_random(field.related.parent_model)
-
-def random_FileField(field):
-    """
-    Find or download a random image object for a FileField.
-    """
-    # TODO: Might be nice to differentiate between ImageField and FileField
-    # TODO: Close the file at the end
-    # TODO: Get a random image from flickr instead
-    remote_path="http://blazingwolf.com/drupal6/files/random%20flame.jpg"
-    local_path = 'tmp/random.jpg' # to not clutter the current folder
-    # if not exists(local_path): 
-    urlretrieve(remote_path, local_path)    
-    f = open(local_path, 'r')
-    f.read()
-    return File(f)
 

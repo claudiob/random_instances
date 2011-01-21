@@ -4,7 +4,7 @@ setup(
     name = "random_instances",
     packages = ["random_instances"],
     package_data={'random_instances': ['*.py']},
-    version = "0.0.1",
+    version = "0.0.2",
     description = "Retrieve or generate random instances of Django models.",
     author = "Red Interactive",
     author_email = "geeks@ff0000.com",
